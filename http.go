@@ -1,72 +1,174 @@
 package gokoreanbots
 
 import (
-	"bytes"
-	"io"
-	"log"
-	"net/http"
+	"github.com/valyala/fasthttp"
+	"net/url"
 	"strconv"
-	"time"
 )
 
-func post(url string, headers *strMap, jsonData []byte) error {
-	client := http.Client{}
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if headers != nil {
-		for key, value := range *headers {
-			req.Header.Add(key, value)
-		}
-	}
-	for tries := 0; tries < 5; tries++ {
-		resp, _ := client.Do(req)
-		switch resp.StatusCode {
-		case http.StatusOK:
-			return nil
-		case http.StatusTooManyRequests:
-			remainLimit, _ := strconv.Atoi(resp.Header.Get("x-ratelimit-remaining"))
-			log.Printf("[GoKOREANBOTS] rate limited. retry after %d seconds", remainLimit)
-			time.Sleep(time.Second * time.Duration(time.Now().Unix()-int64(remainLimit)))
-			continue
-		case http.StatusUnauthorized:
-			return ErrUnauthorized
-		case http.StatusBadRequest:
-			return ErrBadRequest
-		}
-		err := resp.Body.Close()
-		if err != nil {
-			return nil
-		}
-		return nil
-	}
-	return ErrTooManyRequests
+const baseURL = "https://koreanbots.dev/api/v2"
+
+type HTTPClient struct {
+	fasthttpClient fasthttp.Client
 }
 
-func get(url string, headers strMap) (response string, err error) {
-	client := http.Client{}
-	req, _ := http.NewRequest("GET", url, nil)
-	for key, value := range headers {
-		req.Header.Add(key, value)
+// NewHTTPClient create new http client
+func NewHTTPClient() *HTTPClient {
+	return &HTTPClient{
+		fasthttpClient: fasthttp.Client{},
 	}
-	resp, _ := client.Do(req)
-	switch resp.StatusCode {
-	case http.StatusOK:
-		responseByte, _ := io.ReadAll(resp.Body)
-		response = string(responseByte)
-		err = nil
-	case http.StatusBadRequest:
-		responseByte, _ := io.ReadAll(resp.Body)
-		response = string(responseByte)
-		err = ErrUnauthorized
-	case http.StatusTooManyRequests:
-		responseByte, _ := io.ReadAll(resp.Body)
-		response = string(responseByte)
-		err = ErrTooManyRequests
+}
+
+func (c *HTTPClient) PostServers(token, botID string, servers, shards int) error {
+	var err error
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	body, err := BotStatRequest{
+		Servers: servers,
+		Shards:  shards,
+	}.MarshalJSON()
+	if err != nil {
+		return err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			return
-		}
-	}(resp.Body)
-	return
+
+	request.Header.Add("Authorization", token)
+	request.Header.SetMethod("POST")
+	request.SetBody(body)
+	request.SetRequestURI(baseURL + "/bots/" + botID + "/stats")
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return err
+	}
+
+	return getStatusError(response.StatusCode())
+}
+
+func (c *HTTPClient) GetVote(token, botID, userID string) (*Vote, error) {
+	var (
+		err      error
+		rawData  RawResponse
+		voteData Vote
+	)
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.Header.Add("Authorization", token)
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.SetMethod("GET")
+	request.SetRequestURI(baseURL + "/v2/bots/" + botID + "/vote?userID=" + userID)
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rawData.UnmarshalJSON(response.Body())
+	voteData.raw = &rawData
+	if err != nil {
+		return nil, err
+	}
+	err = voteData.UnmarshalJSON(rawData.Data)
+
+	return &voteData, getStatusError(response.StatusCode())
+}
+
+func (c *HTTPClient) SearchBots(query string, page int) (*Bots, error) {
+	var (
+		err     error
+		rawData RawResponse
+		bots    Bots
+	)
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.SetMethod("GET")
+	request.SetRequestURI(baseURL + "/search/bots?query=" + url.QueryEscape(query) + "&page=" + strconv.Itoa(page))
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rawData.UnmarshalJSON(response.Body())
+	bots.raw = &rawData
+	if err != nil {
+		return nil, err
+	}
+	err = bots.UnmarshalJSON(rawData.Data)
+
+	return &bots, getStatusError(response.StatusCode())
+}
+
+func (c *HTTPClient) GetBotsByVote(page int) (*Bots, error) {
+	var (
+		err     error
+		rawData RawResponse
+		bots    Bots
+	)
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.SetMethod("GET")
+	request.SetRequestURI(baseURL + "/list/bots/votes?page=" + strconv.Itoa(page))
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rawData.UnmarshalJSON(response.Body())
+	bots.raw = &rawData
+	if err != nil {
+		return nil, err
+	}
+	err = bots.UnmarshalJSON(rawData.Data)
+
+	return &bots, getStatusError(response.StatusCode())
+}
+
+func (c *HTTPClient) GetNewBots() (*Bots, error) {
+	var (
+		err     error
+		rawData RawResponse
+		bots    Bots
+	)
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.SetMethod("GET")
+	request.SetRequestURI(baseURL + "/list/bots/new")
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = rawData.UnmarshalJSON(response.Body())
+	bots.raw = &rawData
+	if err != nil {
+		return nil, err
+	}
+	err = bots.UnmarshalJSON(rawData.Data)
+
+	return &bots, getStatusError(response.StatusCode())
 }
