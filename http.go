@@ -19,6 +19,7 @@ func NewHTTPClient() *HTTPClient {
 	}
 }
 
+// PostServers post servers to koreanbots
 func (c *HTTPClient) PostServers(token, botID string, servers, shards int) error {
 	var err error
 
@@ -48,6 +49,7 @@ func (c *HTTPClient) PostServers(token, botID string, servers, shards int) error
 	return getStatusError(response.StatusCode())
 }
 
+// GetVote gets vote of user from koreanbots
 func (c *HTTPClient) GetVote(token, botID, userID string) (*Vote, error) {
 	var (
 		err      error
@@ -80,6 +82,7 @@ func (c *HTTPClient) GetVote(token, botID, userID string) (*Vote, error) {
 	return &voteData, getStatusError(response.StatusCode())
 }
 
+// SearchBots searches bots from koreanbots
 func (c *HTTPClient) SearchBots(query string, page int) (*Bots, error) {
 	var (
 		err     error
@@ -111,6 +114,7 @@ func (c *HTTPClient) SearchBots(query string, page int) (*Bots, error) {
 	return &bots, getStatusError(response.StatusCode())
 }
 
+// GetBotsByVote gets bots by vote in koreanbots
 func (c *HTTPClient) GetBotsByVote(page int) (*Bots, error) {
 	var (
 		err     error
@@ -142,6 +146,7 @@ func (c *HTTPClient) GetBotsByVote(page int) (*Bots, error) {
 	return &bots, getStatusError(response.StatusCode())
 }
 
+// GetNewBots gets new bots from koreanbots
 func (c *HTTPClient) GetNewBots() (*Bots, error) {
 	var (
 		err     error

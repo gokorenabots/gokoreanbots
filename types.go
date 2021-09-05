@@ -29,7 +29,7 @@ func (v BotOwner) GetRaw() *RawResponse {
 }
 
 //easyjson:json
-// Bot is bot what registered in Koreanbots
+// Bot is what registered in Koreanbots
 type Bot struct {
 	Response
 
@@ -64,7 +64,7 @@ func (v Bot) GetRaw() *RawResponse {
 }
 
 //easyjson:json
-// Bots are bots what registered in Koreanbots
+// Bots are what registered in Koreanbots
 type Bots struct {
 	Type        string `json:"type"`
 	Data        []Bot  `json:"data"`

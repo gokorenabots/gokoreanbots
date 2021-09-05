@@ -31,10 +31,12 @@ func NewKoreanbots(session *discordgo.Session, token string, postServers bool) *
 	return koreanbots
 }
 
+// GetVote gets vote of user from koreanbots
 func (k Koreanbots) GetVote(userID string) (*Vote, error) {
 	return k.http.GetVote(k.token, k.dgoSession.State.User.ID, userID)
 }
 
+// PostServers post servers to koreanbots
 func (k Koreanbots) PostServers() error {
 	return k.http.PostServers(
 		k.token, k.dgoSession.State.User.ID, len(k.dgoSession.State.Guilds), k.dgoSession.ShardCount)
