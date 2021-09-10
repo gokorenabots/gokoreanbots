@@ -1,6 +1,7 @@
 package gokoreanbots
 
 import (
+	"encoding/json"
 	"github.com/valyala/fasthttp"
 	"net/url"
 	"strconv"
@@ -27,10 +28,10 @@ func (c *HTTPClient) PostServers(token, botID string, servers, shards int) error
 	response := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(response)
 
-	body, err := BotStatRequest{
+	body, err := json.Marshal(&BotStatRequest{
 		Servers: servers,
 		Shards:  shards,
-	}.MarshalJSON()
+	})
 	if err != nil {
 		return err
 	}
@@ -72,14 +73,48 @@ func (c *HTTPClient) GetVote(token, botID, userID string) (*Vote, error) {
 		return nil, err
 	}
 
-	err = rawData.UnmarshalJSON(response.Body())
+	err = json.Unmarshal(response.Body(), &rawData)
 	voteData.raw = &rawData
 	if err != nil {
 		return nil, err
 	}
-	err = voteData.UnmarshalJSON(rawData.Data)
+	err = json.Unmarshal(rawData.Data, &voteData)
+	if err != nil {
+		return nil, err
+	}
 
 	return &voteData, getStatusError(response.StatusCode())
+}
+
+func (c *HTTPClient) GetBot(id string) (*Bot, error) {
+	var (
+		err     error
+		rawData RawResponse
+		bot     Bot
+	)
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.SetMethod("GET")
+	request.SetRequestURI(baseURL + "/bots/" + id)
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(response.Body(), &rawData)
+	bot.raw = &rawData
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(rawData.Data, &bot)
+
+	return &bot, getStatusError(response.StatusCode())
 }
 
 // SearchBots searches bots from koreanbots
@@ -104,12 +139,12 @@ func (c *HTTPClient) SearchBots(query string, page int) (*Bots, error) {
 		return nil, err
 	}
 
-	err = rawData.UnmarshalJSON(response.Body())
+	err = json.Unmarshal(response.Body(), &rawData)
 	bots.raw = &rawData
 	if err != nil {
 		return nil, err
 	}
-	err = bots.UnmarshalJSON(rawData.Data)
+	err = json.Unmarshal(rawData.Data, &bots)
 
 	return &bots, getStatusError(response.StatusCode())
 }
@@ -136,12 +171,12 @@ func (c *HTTPClient) GetBotsByVote(page int) (*Bots, error) {
 		return nil, err
 	}
 
-	err = rawData.UnmarshalJSON(response.Body())
+	err = json.Unmarshal(response.Body(), &rawData)
 	bots.raw = &rawData
 	if err != nil {
 		return nil, err
 	}
-	err = bots.UnmarshalJSON(rawData.Data)
+	err = json.Unmarshal(rawData.Data, &bots)
 
 	return &bots, getStatusError(response.StatusCode())
 }
@@ -168,12 +203,44 @@ func (c *HTTPClient) GetNewBots() (*Bots, error) {
 		return nil, err
 	}
 
-	err = rawData.UnmarshalJSON(response.Body())
+	err = json.Unmarshal(response.Body(), &rawData)
 	bots.raw = &rawData
 	if err != nil {
 		return nil, err
 	}
-	err = bots.UnmarshalJSON(rawData.Data)
+	err = json.Unmarshal(rawData.Data, &bots)
 
 	return &bots, getStatusError(response.StatusCode())
+}
+
+// GetUser get koreanbots user
+func (c *HTTPClient) GetUser(id string) (*User, error) {
+	var (
+		err     error
+		rawData RawResponse
+		user    User
+	)
+
+	request := fasthttp.AcquireRequest()
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.SetMethod("GET")
+	request.SetRequestURI(baseURL + "/users/" + id)
+
+	err = c.fasthttpClient.Do(request, response)
+	fasthttp.ReleaseRequest(request)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(response.Body(), &rawData)
+	user.raw = &rawData
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(rawData.Data, &user)
+
+	return &user, getStatusError(response.StatusCode())
 }
