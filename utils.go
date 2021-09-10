@@ -1,10 +1,5 @@
 package gokoreanbots
 
-import (
-	"errors"
-	"fmt"
-)
-
 func getStatusError(statusCode int) error {
 	switch statusCode {
 	case 400:
@@ -16,6 +11,6 @@ func getStatusError(statusCode int) error {
 	case 200:
 		return nil
 	default:
-		return errors.New(fmt.Sprintf("uncaught status code %d", statusCode))
+		return ErrUnknownStatusCode
 	}
 }
